@@ -4,7 +4,7 @@ class physics{
     constructor(){
          this.g=50;
          this.jumpforce=-25;
-         this.force=0.7;
+         this.force=1;
          this.terminal=7;
          this.negterminal=-7;
          this.friction=1;

@@ -125,7 +125,7 @@ class Player {
     this.player.x+=this.player.speed;
     
     if(Math.abs(this.player.speed)<0.6) this.player.speed=0;
-    this.player.speed-=(0.4 * Math.sign(this.player.speed));
+    this.player.speed-=(0.8 * Math.sign(this.player.speed));
     
     
     
