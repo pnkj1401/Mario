@@ -14,7 +14,7 @@ while (!game.getIsClosed()) {
   game.handleEvents();
   game.update();
   game.render();
-  
+
   r.EndMode2D();
 
   r.EndDrawing();
