@@ -307,7 +307,10 @@ class Map {
         return false;
       }
       this.collisionmap[i][j]=9;
-      return true;
+      return {
+        y: i*this.tile.width,
+        x:j*this.tile.width
+      };
     }
 
     let k=Math.floor((playerX+playerWidth)/this.tile.width);

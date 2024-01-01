@@ -3,7 +3,7 @@ class physics{
 
     constructor(){
          this.g=50;
-         this.jumpforce=-25;
+         this.jumpforce=-21;
          this.force=1;
          this.terminal=7;
          this.negterminal=-7;
@@ -26,6 +26,10 @@ class physics{
             object.speed=this.negterminal;
         }
         else object.speed-=this.force
+    }
+    applyfriction(object){
+        if(Math.abs(object.speed)<0.6) object.speed=0;
+        object.speed-=(0.8 * Math.sign(object.speed));
     }
    
 }
