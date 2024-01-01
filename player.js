@@ -3,8 +3,6 @@ const r = require('raylib');
 const TM = require('./texturemanager');
 const texturemanager = new TM();
 const Phy = require('./physics');
-const Texturemanager = require('./texturemanager');
-const { IsKeyUp } = require('raylib');
 
 let physics = new Phy();
 let playerpath=r.LoadImage("./assets/Mario.png");
