@@ -137,7 +137,7 @@ class Player {
     }
     this.player.x+=this.player.speed;
     
-   physics.applyfriction(this.player);
+    physics.applyfriction(this.player);
     
     
     
