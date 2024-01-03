@@ -1,147 +1,89 @@
+// let playerpath=r.LoadImage("./assets/Mario.png");
+// let Bigwalkpath=r.LoadImage("./assets/Bigwalk.png");
 
-const r = require('raylib');
-const TM = require('./texturemanager');
-const texturemanager = new TM();
-const Phy = require('./physics');
-
-let physics = new Phy();
-let playerpath=r.LoadImage("./assets/Mario.png");
-let Bigwalkpath=r.LoadImage("./assets/Bigwalk.png");
+import raylib from "raylib";
+import Vector2 from "./vector2.js";
+import { PhysicsBody } from "./physics.js";
+import Entity from "./entity.js";
+import { Tile } from "./map.js";
 
 
-class Player {
-  canJump = false;
-  smallHeight = 38;
-  bigHeight = 58;
-  constructor() {
-    this.player = {
-      x: 1,
-      y: 5,
-      velocity: 0,
-      speed:0,
-      width : 30,
-      height:this.smallHeight,
-      texture:texturemanager.loadtexture(playerpath),
-      bigwalk:texturemanager.loadtexture(Bigwalkpath),
-      state:'idle'
-    };
-
-    this.small={
-      idle:{ x:6,y:0},
-      running:[{},{}],
-      jump:[{},{}]
-    }
-    this.big={
-      idle:{ x:6,y:0},
-      running:[{},{}],
-      jump:[{},{}]
-    }
-    texturemanager.unloadimage(playerpath);
-    texturemanager.unloadimage(Bigwalkpath);
-    this.isSmall = true; 
+export default class Player extends Entity {
+  #events = {
+    moveLeft: false,
+    moveRight: false,
+    jump: false
+  };
+  constructor(game, x, y, size, texture) {
+    super(game, x, y);
+    this.width = size;
+    this.height = size;
+    this.texture = texture;
+    this.physicsBody = new PhysicsBody(this.position);
+    this.physicsBody.mass = 1;
   }
 
   handleEvents() {
-
-    if(r.IsKeyDown(r.KEY_RIGHT))
-    {
-        this.player.state='running';      
-        physics.addspeed(this.player)                  
-    }
-    // if(IsKeyUp(r.KEY_RIGHT)) this.player.state='idle';
-    if(r.IsKeyDown(r.KEY_LEFT))
-    {
-        physics.reducespeed(this.player)   
-    }
-   
-    this.canJump = (r.IsKeyDown(r.KEY_UP) || r.IsKeyDown(r.KEY_SPACE) );
-
-    if (r.IsKeyPressed(r.KEY_LEFT_CONTROL)) {
-      
-      // if(this.player.height===this.smallHeight)  this.player.y-=40
-      this.isSmall = !this.isSmall;
-      this.player.height = this.isSmall ? this.smallHeight : this.bigHeight;
-    }
-    
+    this.#events.moveLeft = raylib.IsKeyDown(raylib.KEY_A) || raylib.IsKeyDown(raylib.KEY_LEFT);
+    this.#events.moveRight = raylib.IsKeyDown(raylib.KEY_D) || raylib.IsKeyDown(raylib.KEY_RIGHT);
+    this.#events.jump = raylib.IsKeyPressed(raylib.KEY_SPACE) || raylib.IsKeyPressed(raylib.KEY_W) || raylib.IsKeyPressed(raylib.KEY_UP);
   }
 
-  update(map) {
+  update(delta) {
 
-    let time = r.GetFrameTime();
-    physics.applygravity(this.player, time);
-    this.player.y += this.player.velocity;
-    let nextgroundpos={
-      x:this.player.x,
-      y:this.player.y+this.player.velocity,
-      velocity: this.player.velocity,
-      width : this.player.width,
-      height:this.player.height
+    this.handleEvents();
+    this.physicsBody.addGravity(delta);
+    if(this.#events.moveLeft) {
+      this.physicsBody.applyForce(delta, new Vector2(-1500, 0));
     }
-    
-    let groundtile=map.groundCollision(nextgroundpos);
-
-    if (groundtile) 
-    {
-      this.player.state='idle'
-      if(this.player.speed>0)
-      {
-        this.player.state='running';
+    if(this.#events.moveRight) {
+      this.physicsBody.applyForce(delta, new Vector2(1500, 0));
+    }
+    const newPosition = this.position.copy().add(Vector2.scaled(this.physicsBody.velocity, delta));
+    const tiles = this.game.tileMap.getCollidingTiles(newPosition.x, newPosition.y, this.width, this.height);
+    let groundTile = null, leftTile = null, rightTile = null;
+    for(let column = tiles.columnStart; column <= tiles.columnEnd; column++) {
+      const tile = this.game.tileMap.get(column, tiles.rowEnd);
+      if(tile.data > 0) {
+        groundTile = tile;
+        break;
       }
-      else if(this.player.speed<0)
-      {
-        this.player.state="running";
+    }
+    for(let row = tiles.rowStart; row < tiles.rowEnd; row++) {
+      let tile = this.game.tileMap.get(tiles.columnStart, row);
+      if(tile.data > 0 && leftTile === null) {
+        leftTile = tile;
       }
-      this.player.y = groundtile.y-this.player.height-0.5;
-      this.player.velocity = 0;
-      if(this.canJump)
-      {
-        physics.applyjumpforce(this.player);    
-      } 
-    } 
-    else {
-      this.player.state="jump";
+      tile = this.game.tileMap.get(tiles.columnEnd, row);
+      if(tile.data > 0 && rightTile === null) {
+        rightTile = tile;
+      }
     }
-    let nexttoppos={
-      x:this.player.x,
-      y:this.player.y+this.player.velocity,
-      velocity: this.player.velocity,
-      width : this.player.width,
-      height:this.player.height
+    if(groundTile) {
+      groundTile.borderColor = raylib.WHITE;
+      this.physicsBody.velocity.y = 0;
+      this.position.y = Math.floor(groundTile.y) - this.height - 1;
     }
-    
-    let toptile=map.topCollision(nexttoppos)
-    if(toptile){
-      this.player.velocity=1;
-      // this.player.y += this.player.velocity;   
-    } 
-    
-    
-    let nextrightpos={
-      x:this.player.x+this.player.speed,
-      y:this.player.y,
-      velocity: this.player.velocity,
-      width : this.player.width,
-      height:this.player.height
+    if(leftTile) {
+      leftTile.borderColor = raylib.RED;
+      this.physicsBody.velocity.x = 0;
+      this.position.x = Math.floor(leftTile.x) + Tile.size + 1;
     }
-    if(map.rightCollision(nextrightpos))
-    {
-       this.player.speed=0;
-      //  this.player.x-=2;
+    if(rightTile) {
+      rightTile.borderColor = raylib.BLUE;
+      this.physicsBody.velocity.x = 0;
+      this.position.x = Math.floor(rightTile.x) - this.width - 1;
     }
-
-    if(map.leftCollision(nextrightpos)) {
-      this.player.speed=0;
-      // this.player.x+=2;
+    if(groundTile !== null && this.#events.jump) {
+      this.physicsBody.applyForce(delta, new Vector2(0, -60000));
     }
-    this.player.x+=this.player.speed;
-    
-    physics.applyfriction(this.player);
-    
-    
-    
+    this.physicsBody.update(delta);
+    this.game.camera.target = this.position;
   }
 
   render() {
+    raylib.DrawRectangle(this.position.x, this.position.y, this.width, this.height, raylib.BLACK);
+    return;
 
     r.DrawRectangleLines(this.player.x,this.player.y,this.player.width,this.player.height,r.WHITE);
     
@@ -224,8 +166,6 @@ class Player {
     }
    
  
-}
-  
-}
+  }
 
-module.exports = Player;
+};

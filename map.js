@@ -1,8 +1,182 @@
+import raylib from "raylib";
+import Canvas from "./canvas.js";
+import Vector2 from "./vector2.js";
 
-const r = require('raylib');
-const TM = require('./texturemanager');
-const texturemanager = new TM();
+export class Tile {
 
+  static #size = 32;
+  static #textureData = {};
+
+  /** @type {raylib.Texture} */
+  #texture = null;
+
+  constructor(x, y, data) {
+    this.x = x;
+    this.y = y;
+    this.data = data;
+    this.borderColor = null;
+    this.#texture = Tile.#textureData[data] ?? null;
+  }
+
+  render() {
+    if(this.#texture !== null) {
+      const source = {
+        x: 0,
+        y: 0,
+        width: this.#texture.width,
+        height: this.#texture.height
+      };
+      const destination = {
+        x: this.x,
+        y: this.y,
+        width: Tile.#size,
+        height: Tile.#size
+      };
+      raylib.DrawTexturePro(this.#texture, source, destination, { x: 0, y: 0 }, 0, raylib.WHITE);
+    }
+    if(this.borderColor) {
+      raylib.DrawRectangleLinesEx({
+        x: this.x,
+        y: this.y,
+        width: Tile.#size,
+        height: Tile.#size
+      }, 2, this.borderColor);
+    }
+  }
+
+  static get size() {
+    return this.#size;
+  }
+
+  static setTextureData(data) {
+    this.#textureData = data;
+  }
+
+};
+
+export default class TileMap {
+
+  /** @type {Tile[][]} */
+  #grid;
+
+  /**
+   * @param {number} columns Number of columns
+   * @param {number} rows Number of rows
+  */
+  constructor(columns, rows) {
+    this.#grid = new Array(columns);
+    for(let column = 0; column < columns; column++) {
+      this.#grid[column] = new Array(rows);
+      for(let row = 0; row < rows; row++) {
+        this.#grid[column][row] = null;
+      }
+    }
+  }
+
+  get columns() {
+    return this.#grid.length;
+  }
+
+  get rows() {
+    return this.#grid[0]?.length ?? 0;
+  }
+
+  get(column, row) {
+    return this.#grid[column]?.[row] ?? null;
+  }
+
+  /** @param {Vector2} position */
+  getByPosition(position) {
+    const flooredVector = position.floored();
+    return this.#grid[flooredVector.x]?.[flooredVector.y] ?? null;
+  }
+
+  set(column, row, tile) {
+    this.#grid[column][row] = tile;
+  }
+
+  render() {
+    for(const array of this.#grid) {
+      for(const tile of array) {
+        tile?.render();
+      }
+    }
+  }
+
+  *[Symbol.iterator] () {
+    for(let column = 0; column < this.#grid.length; column++) {
+      for(let row = 0; row < this.#grid[column].length; row++) {
+        yield /** @type {const} */ ([ column, row, this.#grid[column][row] ]);
+      }
+    }
+  }
+
+  getCollidingTiles(x, y, width, height) {
+    const columnStart = Math.floor(x / Tile.size);
+    const rowStart = Math.floor(y / Tile.size);
+    const columnsOccupiedInWidth = Math.floor(width / Tile.size);
+    const rowsOccupiedInHeight = Math.floor(height / Tile.size);
+    const columnEnd = Math.min(columnStart + columnsOccupiedInWidth, this.columns - 1);
+    const rowEnd = Math.min(rowStart + rowsOccupiedInHeight, this.rows - 1);
+    // /** @type {Set<Tile>} */
+    // const tiles = new Set();
+    // for(const column = columnStart; column <= columnEnd; column++) {
+    //   for(const row = rowStart; row <= rowEnd; row++) {
+    //     tiles.add(this.#grid[column][row]);
+    //   }
+    // }
+    // return tiles;
+    return {
+      columnStart, columnEnd, rowStart, rowEnd
+    };
+  }
+
+  /** @param {number[][]} matrix */
+  static load(matrix) {
+    console.log(matrix[0]?.length, matrix.length);
+    const tiles = new TileMap(matrix[0]?.length, matrix.length);
+    for(const [ column, row ] of tiles) {
+      const tile = new Tile(
+        column * Tile.size,
+        row * Tile.size,
+        Number.parseInt(matrix[row][column] ?? 1)
+      );
+      tiles.set(column, row, tile);
+    }
+    // tiles.generateTexture();
+    return tiles;
+  }
+
+
+  /** @param {string} data */
+  static loadFromText(data) {
+    const rows = data.split("\n");
+    const matrix = rows.filter(row => row.trim() !== "")
+      .map(row => row.trim().split(" "));
+    return TileMap.load(matrix);
+  }
+
+  /** @param {string} name */
+  static loadFromImageColors(name, colorsMap = {}) {
+    const image = raylib.LoadImage("assets/" + name);
+    const colors = Canvas.getImageColors(image);
+    const matrix = [];
+    for(const { x, y, color } of colors) {
+      if(y in matrix === false) {
+        matrix[y] = [];
+      }
+      const key = `${ color.r }_${ color.g }_${ color.b }_${ color.a }`;
+      // if(key in colorsMap === false)
+      // console.log(key)
+      matrix[y][x] = colorsMap[key];
+    }
+    // const rows = image.split("\n");
+    // const matrix = rows.filter(row => row.trim() !== "")
+    //   .map(row => row.trim().split(" "));
+    return this.load(matrix);
+  }
+
+};
 
 class Map {
   constructor() {
@@ -36,29 +210,29 @@ class Map {
       "218_255_127_255": 4,
       "76_255_0_255": 5
     })
-          this.topgrasspath=r.LoadImage("./assets/grass.png");
-          this.brickpath=r.LoadImage("./assets/brick.png");
-          this.groundstonepath=r.LoadImage("./assets/groundstone.png");
-          this.stonepath=r.LoadImage("./assets/stone.png");
-          this.questionpath=r.LoadImage("./assets/questionmark.png");
-          this.pipepath=r.LoadImage("./assets/pipe.png");
-          this.coinpath=r.LoadImage("./assets/coin.png")
+          this.topgrasspath=raylib.LoadImage("./assets/grass.png");
+          this.brickpath=raylib.LoadImage("./assets/brick.png");
+          this.groundstonepath=raylib.LoadImage("./assets/groundstone.png");
+          this.stonepath=raylib.LoadImage("./assets/stone.png");
+          this.questionpath=raylib.LoadImage("./assets/questionmark.png");
+          this.pipepath=raylib.LoadImage("./assets/pipe.png");
+          this.coinpath=raylib.LoadImage("./assets/coin.png")
 
-          this.topgrass=texturemanager.loadtexture(this.topgrasspath);
-          this.brick=texturemanager.loadtexture(this.brickpath);
-          this.groundstone=texturemanager.loadtexture(this.groundstonepath);
-          this.stone=texturemanager.loadtexture(this.stonepath);
-          this.question=texturemanager.loadtexture(this.questionpath);
-          this.pipe=texturemanager.loadtexture(this.pipepath);
-          this.coin=texturemanager.loadtexture(this.coinpath)
+          this.topgrass=texturemanageraylib.loadtexture(this.topgrasspath);
+          this.brick=texturemanageraylib.loadtexture(this.brickpath);
+          this.groundstone=texturemanageraylib.loadtexture(this.groundstonepath);
+          this.stone=texturemanageraylib.loadtexture(this.stonepath);
+          this.question=texturemanageraylib.loadtexture(this.questionpath);
+          this.pipe=texturemanageraylib.loadtexture(this.pipepath);
+          this.coin=texturemanageraylib.loadtexture(this.coinpath)
 
-          texturemanager.unloadimage(this.topgrasspath);
-          texturemanager.unloadimage(this.brickpath);
-          texturemanager.unloadimage(this.groundstonepath);
-          texturemanager.unloadimage(this.stonepath);
-          texturemanager.unloadimage(this.questionpath);
-          texturemanager.unloadimage(this.pipepath);
-          texturemanager.unloadimage(this.coinpath);
+          texturemanageraylib.unloadimage(this.topgrasspath);
+          texturemanageraylib.unloadimage(this.brickpath);
+          texturemanageraylib.unloadimage(this.groundstonepath);
+          texturemanageraylib.unloadimage(this.stonepath);
+          texturemanageraylib.unloadimage(this.questionpath);
+          texturemanageraylib.unloadimage(this.pipepath);
+          texturemanageraylib.unloadimage(this.coinpath);
 
   }
 
@@ -71,30 +245,30 @@ class Map {
 
       
         if (this.maparray[i][j] === 0) {
-          texturemanager.draw(this.tile.x, this.tile.y, this.tile.height,  this.tile.width, r.SKYBLUE, this.tile.height,  this.tile.width,);
+          texturemanageraylib.draw(this.tile.x, this.tile.y, this.tile.height,  this.tile.width, raylib.SKYBLUE, this.tile.height,  this.tile.width,);
 
         } else if (this.maparray[i][j] === 1) {   
-            texturemanager.DrawTexture(this.groundstone,this.tile.x,this.tile.y,r.WHITE, this.tile.height,  this.tile.width,); 
+            texturemanageraylib.DrawTexture(this.groundstone,this.tile.x,this.tile.y,raylib.WHITE, this.tile.height,  this.tile.width,); 
 
         } else if(this.maparray[i][j]===2) {
-          texturemanager.DrawTexture(this.brick,this.tile.x,this.tile.y,r.WHITE, this.tile.height,  this.tile.width,);
+          texturemanageraylib.DrawTexture(this.brick,this.tile.x,this.tile.y,raylib.WHITE, this.tile.height,  this.tile.width,);
         }
 
         else if(this.maparray[i][j]===3){
-          texturemanager.DrawTexture(this.stone,this.tile.x,this.tile.y,r.WHITE, this.tile.height,  this.tile.width,);
+          texturemanageraylib.DrawTexture(this.stone,this.tile.x,this.tile.y,raylib.WHITE, this.tile.height,  this.tile.width,);
         }
         else if(this.maparray[i][j]===4){
-          texturemanager.DrawTexture(this.question,this.tile.x,this.tile.y,r.WHITE, this.tile.height,  this.tile.width,);
+          texturemanageraylib.DrawTexture(this.question,this.tile.x,this.tile.y,raylib.WHITE, this.tile.height,  this.tile.width,);
         }
         else if(this.maparray[i][j]===5){
-          texturemanager.DrawTexture(this.pipe,this.tile.x,this.tile.y,r.WHITE, this.tile.height,  this.tile.width,);
+          texturemanageraylib.DrawTexture(this.pipe,this.tile.x,this.tile.y,raylib.WHITE, this.tile.height,  this.tile.width,);
         }
         else if(this.maparray[i][j]===6){
-          texturemanager.DrawTexture(this.coin,this.tile.x,this.tile.y,r.WHITE, this.tile.height,  this.tile.width,);
+          texturemanageraylib.DrawTexture(this.coin,this.tile.x,this.tile.y,raylib.WHITE, this.tile.height,  this.tile.width,);
         }
 
         else{
-          texturemanager.draw(this.tile.x, this.tile.y, this.tile.height,  this.tile.width, r.SKYBLUE, this.tile.height,  this.tile.width,);
+          texturemanageraylib.draw(this.tile.x, this.tile.y, this.tile.height,  this.tile.width, raylib.SKYBLUE, this.tile.height,  this.tile.width,);
         }
       }
     }
@@ -106,16 +280,16 @@ class Map {
         this.collisionmap.x = j * 40;
         this.collisionmap.y = i * 40;
         if(this.collisionmap[i][j]===9){
-          texturemanager.drawborder(this.collisionmap.x,this.collisionmap.y)
+          texturemanageraylib.drawborder(this.collisionmap.x,this.collisionmap.y)
         }
       }
     }
   }
   
   leftCollision(player) {
-    const playerX = player.x;
-    const playerY = player.y;
-    const playerHeight = player.height;
+    const playerX = playeraylib.x;
+    const playerY = playeraylib.y;
+    const playerHeight = playeraylib.height;
     
     
     let j=Math.floor((playerX)/this.tile.width);
@@ -162,13 +336,13 @@ class Map {
   
 
   rightCollision(player){
-    const playerX = player.x;
-    const playerY = player.y;
-    const playerWidth = player.width;
-    const playerHeight = player.height;
+    const playerX = playeraylib.x;
+    const playerY = playeraylib.y;
+    const playerWidth = playeraylib.width;
+    const playerHeight = playeraylib.height;
      
     
-    let j=Math.floor((playerX+player.width)/this.tile.width);
+    let j=Math.floor((playerX+playeraylib.width)/this.tile.width);
     for(let inc=0;inc<playerHeight;inc+=20){
       let i=Math.floor((playerY+inc)/this.tile.width);
           if(this.maparray[i][j] )
@@ -213,10 +387,10 @@ class Map {
 
   groundCollision(player){
     // console.log(player);
-    const playerX = player.x;
-    const playerY = player.y;
-    const playerWidth = player.width;
-    const playerHeight = player.height;
+    const playerX = playeraylib.x;
+    const playerY = playeraylib.y;
+    const playerWidth = playeraylib.width;
+    const playerHeight = playeraylib.height;
     
     let i=Math.floor((playerY+playerHeight)/this.tile.width);
     let j=Math.floor((playerX+playerWidth)/this.tile.width);
@@ -253,9 +427,9 @@ class Map {
 
 
   topCollision(player){
-    const playerX = player.x;
-    const playerY = player.y;
-    const playerWidth = player.width;
+    const playerX = playeraylib.x;
+    const playerY = playeraylib.y;
+    const playerWidth = playeraylib.width;
 
     let i=Math.floor((playerY)/this.tile.width);
     let j=Math.floor((playerX)/this.tile.width);
@@ -291,33 +465,4 @@ class Map {
     if(this.maparray[i][j]==6) return true;
     else return false;
   }
-}
-
-module.exports = Map;
-
-function *getImageColors(image) {
-  for(let x = 0; x < image.width; x++) {
-    for(let y = 0; y < image.height; y++) {
-      const index = (image.width * y + x) * 4;
-      yield {
-        x, y,
-        color: r.GetPixelColor(image.data + index, r.PIXELFORMAT_UNCOMPRESSED_R8G8B8A8)
-      };
-    }
-  }
-}
-
-
-function loadFromImageColors(filepath, colorsMap = {}) {
-  const image = r.LoadImage(filepath);
-  const colors = getImageColors(image);
-  const matrix = [];
-  for(const { x, y, color } of colors) {
-    if(y in matrix === false) {
-      matrix[y] = [];
-    }
-    const key = `${ color.r }_${ color.g }_${ color.b }_${ color.a }`;
-    matrix[y][x] = colorsMap[key];
-  }
-  return matrix;
 }

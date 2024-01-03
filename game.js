@@ -1,48 +1,57 @@
+import raylib from "raylib";
+import Canvas from "./canvas.js";
 
-const r = require('raylib');
-const TM = require('./texturemanager');
-const Map = require('./map');
-const Player = require('./player');
+export default class Game {
 
-const texturemanager = new TM();
+  /** @type {raylib.Camera2D} */
+  camera = raylib.Camera2D();
 
-class Game {
-  constructor(screenWidth, screenHeight, name) {
-    this.screenWidth = screenWidth;
-    this.screenHeight = screenHeight;
-    this.name = name;
-    r.InitWindow(screenWidth, screenHeight, name);
-    r.SetTargetFPS(60);
-    this.camera = {
-      offset: { x: screenWidth / 2, y: screenHeight * 0 },
-      target: { x: 0, y: 0 },
-      rotation: 0,
-      zoom: 1
-    };
-    this.mymap = new Map();
-    this.player = new Player();
-   
+  /** @param {Canvas} canvas */
+  constructor(canvas) {
+    this.canvas = canvas;
+
+    this.camera.target = raylib.Vector2Zero();
+    this.camera.offset = this.canvas.center;
+    this.camera.rotation = 0;
+    this.camera.zoom = 1;
+
   }
 
-  getIsClosed() {
-    return r.WindowShouldClose();
+  run() {
+
+    while(!raylib.WindowShouldClose()) {
+
+      // const desiredFPS = raylib.IsKeyDown(raylib.KEY_F) ? 60 : 1;
+      // raylib.SetTargetFPS(desiredFPS);
+
+      const deltaTime = raylib.GetFrameTime();
+      this.update(deltaTime);
+
+      raylib.BeginDrawing();
+      raylib.ClearBackground(this.canvas.backgroundColor);
+
+      raylib.BeginMode2D(this.camera);
+
+      this.render();
+
+      raylib.EndMode2D();
+
+      raylib.EndDrawing();
+
+    }
+
+    raylib.CloseWindow();
+
   }
+
 
   handleEvents() {
    this.player.handleEvents();
   }
 
   update() {
-    this.camera.target.x = this.player.player.x;
-    // this.camera.target.y = this.player.player.y;
-    this.player.update(this.mymap);
   }
 
   render() {
-    this.mymap.drawmap();
-    this.player.render();
-    this.mymap.drawcollisionmap();
   }
-}
-
-module.exports = Game;
+};

@@ -1,23 +1,6 @@
-const Game = require('./game');
-const r = require('raylib');
+import MarioGame from "./mario-game.js";
 
-const screenWidth = 1000;
-const screenHeight = 700;
-const game = new Game(screenWidth, screenHeight, 'name');
 
-while (!game.getIsClosed()) {
-  r.BeginDrawing();
-  r.ClearBackground(r.SKYBLUE);
+const game = new MarioGame();
 
-  r.BeginMode2D(game.camera);
-
-  game.handleEvents();
-  game.update();
-  game.render();
-
-  r.EndMode2D();
-
-  r.EndDrawing();
-}
-
-r.CloseWindow();
+game.run();
