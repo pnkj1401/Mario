@@ -36,7 +36,7 @@ export default class MarioGame extends Game {
       6: Canvas.loadTexture("coin.png")
     });
     this.tileMap = TileMap.loadFromImageColors("mario1.png", colorDataMap);
-    this.player = new Player(this, 100, 100, 32, Canvas.loadTexture("coin.png"));
+    this.player = new Player(this, 100, 100, 50, Canvas.loadTexture("coin.png"));
     console.log(this.tileMap);
   }
 

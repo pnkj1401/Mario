@@ -18,16 +18,14 @@ export class PhysicsBody {
 
   /** @param {Vector2} force */
   applyForce(delta, force) {
-    const acceleration = new Vector2(force.x / this.mass, force.y / this.mass);
+    const acceleration = Vector2.scaled(force, 1 / this.mass);
     this.velocity.add(acceleration.scale(delta));
-    const magnitude = Math.sqrt(force.x * force.x + force.y * force.y) / 10;
-    const terminalVelocity = Math.sqrt(
-      (2 * this.mass * magnitude) / (this.area * this.dragCoefficient)
-    );
-    const absoluteVelocity = Math.abs(this.velocity.x);
-    if(absoluteVelocity > terminalVelocity) {
-      this.velocity.x = Math.sign(this.velocity.x) * terminalVelocity;
-    }
+    const terminalVelocity = this.#calculateTerminalVelocity(force.magnitude());
+    this.velocity.limit(terminalVelocity);
+  }
+
+  #calculateTerminalVelocity(forceMagnitude) {
+    return Math.sqrt(2 * this.mass * forceMagnitude / (this.area * this.dragCoefficient));
   }
 
   addGravity() {
@@ -42,15 +40,14 @@ export class PhysicsBody {
   }
 
   update(delta) {
-    const frictionDirection = -Math.sign(this.velocity.x);
-    if(frictionDirection !== 0) {
-      let frictionFactor = 20;
-      const absoluteVelocity = Math.abs(this.velocity.x);
-      if(absoluteVelocity < frictionFactor) {
-        frictionFactor = absoluteVelocity;
-      }
-      const frictionForce = new Vector2(frictionDirection * frictionFactor, 0);
-      this.velocity.add(frictionForce);
+    const frictionFactor = 1000 * delta;
+    const frictionDirection = this.velocity.copy().scale(-1).normalize();
+    const frictionForce = frictionDirection.scale(frictionFactor);
+    const velocityMagnitude = this.velocity.magnitude();
+    this.velocity.add(frictionForce).limit(velocityMagnitude);
+    if(Math.abs(this.velocity.x) < 0.1 && Math.abs(this.velocity.y) < 0.1) {
+      this.velocity.x = 0;
+      this.velocity.y = 0;
     }
     this.#entityPosition.add(Vector2.scaled(this.velocity, delta));
   }

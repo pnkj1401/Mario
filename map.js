@@ -14,7 +14,16 @@ export class Tile {
     this.x = x;
     this.y = y;
     this.data = data;
-    this.borderColor = null;
+    this.border = {
+      /** @type {raylib.Color | null} */
+      left: null,
+      /** @type {raylib.Color | null} */
+      right: null,
+      /** @type {raylib.Color | null} */
+      bottom: null,
+      /** @type {raylib.Color | null} */
+      top: null
+    };
     this.#texture = Tile.#textureData[data] ?? null;
   }
 
@@ -34,13 +43,42 @@ export class Tile {
       };
       raylib.DrawTexturePro(this.#texture, source, destination, { x: 0, y: 0 }, 0, raylib.WHITE);
     }
-    if(this.borderColor) {
+    const borderWidth = 4;
+    if(this.border.left) {
+      raylib.DrawRectangleLinesEx({
+        x: this.x,
+        y: this.y,
+        width: borderWidth,
+        height: Tile.#size
+      }, borderWidth, this.border.left);
+      this.border.left = null;
+    }
+    if(this.border.right) {
+      raylib.DrawRectangleLinesEx({
+        x: this.x + Tile.#size - borderWidth,
+        y: this.y,
+        width: borderWidth,
+        height: Tile.#size
+      }, borderWidth, this.border.right);
+      this.border.right = null
+    }
+    if(this.border.top) {
       raylib.DrawRectangleLinesEx({
         x: this.x,
         y: this.y,
         width: Tile.#size,
-        height: Tile.#size
-      }, 2, this.borderColor);
+        height: borderWidth
+      }, borderWidth, this.border.top);
+      this.border.top = null;
+    }
+    if(this.border.bottom) {
+      raylib.DrawRectangleLinesEx({
+        x: this.x,
+        y: this.y + Tile.#size - borderWidth,
+        width: Tile.#size,
+        height: borderWidth
+      }, borderWidth, this.border.bottom);
+      this.border.bottom = null;
     }
   }
 
@@ -101,6 +139,13 @@ export default class TileMap {
         tile?.render();
       }
     }
+    const { rows, columns } = this;
+    for(let column = 0; column < columns; column++) {
+      raylib.DrawLine(column * Tile.size, 0, column * Tile.size, rows * Tile.size, raylib.WHITE);
+    }
+    for(let row = 0; row < rows; row++) {
+      raylib.DrawLine(0, row * Tile.size, columns * Tile.size, row * Tile.size, raylib.WHITE);
+    }
   }
 
   *[Symbol.iterator] () {
@@ -112,12 +157,12 @@ export default class TileMap {
   }
 
   getCollidingTiles(x, y, width, height) {
-    const columnStart = Math.floor(x / Tile.size);
-    const rowStart = Math.floor(y / Tile.size);
-    const columnsOccupiedInWidth = Math.floor(width / Tile.size);
-    const rowsOccupiedInHeight = Math.floor(height / Tile.size);
-    const columnEnd = Math.min(columnStart + columnsOccupiedInWidth, this.columns - 1);
-    const rowEnd = Math.min(rowStart + rowsOccupiedInHeight, this.rows - 1);
+    const columnStart = x / Tile.size;
+    const rowStart = y / Tile.size;
+    const columnsOccupiedInWidth = width / Tile.size;
+    const rowsOccupiedInHeight = height / Tile.size;
+    const columnEnd = Math.min(Math.floor(columnStart + columnsOccupiedInWidth), this.columns - 1);
+    const rowEnd = Math.min(Math.floor(rowStart + rowsOccupiedInHeight), this.rows - 1);
     // /** @type {Set<Tile>} */
     // const tiles = new Set();
     // for(const column = columnStart; column <= columnEnd; column++) {
@@ -127,7 +172,10 @@ export default class TileMap {
     // }
     // return tiles;
     return {
-      columnStart, columnEnd, rowStart, rowEnd
+      columnStart: Math.floor(columnStart),
+      columnEnd,
+      rowStart: Math.floor(rowStart),
+      rowEnd
     };
   }
 
