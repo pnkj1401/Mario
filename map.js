@@ -1,7 +1,10 @@
 import raylib from "raylib";
 import Canvas from "./canvas.js";
 import Vector2 from "./vector2.js";
+import { PhysicsWorld } from "./physics.js";
+import { using } from "./util.js";
 
+/** @template {number} T */
 export class Tile {
 
   static #size = 32;
@@ -10,9 +13,12 @@ export class Tile {
   /** @type {raylib.Texture} */
   #texture = null;
 
+  /**
+   * @param {number} x
+   * @param {number} y
+   * @param {T} data
+  */
   constructor(x, y, data) {
-    this.x = x;
-    this.y = y;
     this.data = data;
     this.border = {
       /** @type {raylib.Color | null} */
@@ -24,6 +30,10 @@ export class Tile {
       /** @type {raylib.Color | null} */
       top: null
     };
+    this.physicsBody = data !== 0 ? PhysicsWorld.createBody("rectangle", x, y, Tile.#size, Tile.#size, {
+      isStatic: true,
+      restitution: 0
+    }) : null;
     this.#texture = Tile.#textureData[data] ?? null;
   }
 
@@ -36,18 +46,21 @@ export class Tile {
         height: this.#texture.height
       };
       const destination = {
-        x: this.x,
-        y: this.y,
+        x: this.physicsBody.position.x,
+        y: this.physicsBody.position.y,
         width: Tile.#size,
         height: Tile.#size
       };
       raylib.DrawTexturePro(this.#texture, source, destination, { x: 0, y: 0 }, 0, raylib.WHITE);
     }
+    using(this.physicsBody, function() {
+      raylib.DrawRectangleLines(this.position.x, this.position.y, this.bounds.max.x - this.bounds.min.x, this.bounds.max.y - this.bounds.min.y, raylib.RED);
+    });
     const borderWidth = 4;
     if(this.border.left) {
       raylib.DrawRectangleLinesEx({
-        x: this.x,
-        y: this.y,
+        x: this.physicsBody.position.x,
+        y: this.physicsBody.position.y,
         width: borderWidth,
         height: Tile.#size
       }, borderWidth, this.border.left);
@@ -55,8 +68,8 @@ export class Tile {
     }
     if(this.border.right) {
       raylib.DrawRectangleLinesEx({
-        x: this.x + Tile.#size - borderWidth,
-        y: this.y,
+        x: this.physicsBody.position.x + Tile.#size - borderWidth,
+        y: this.physicsBody.position.y,
         width: borderWidth,
         height: Tile.#size
       }, borderWidth, this.border.right);
@@ -64,8 +77,8 @@ export class Tile {
     }
     if(this.border.top) {
       raylib.DrawRectangleLinesEx({
-        x: this.x,
-        y: this.y,
+        x: this.physicsBody.position.x,
+        y: this.physicsBody.position.y,
         width: Tile.#size,
         height: borderWidth
       }, borderWidth, this.border.top);
@@ -73,8 +86,8 @@ export class Tile {
     }
     if(this.border.bottom) {
       raylib.DrawRectangleLinesEx({
-        x: this.x,
-        y: this.y + Tile.#size - borderWidth,
+        x: this.physicsBody.position.x,
+        y: this.physicsBody.position.y + Tile.#size - borderWidth,
         width: Tile.#size,
         height: borderWidth
       }, borderWidth, this.border.bottom);
@@ -179,8 +192,11 @@ export default class TileMap {
     };
   }
 
-  /** @param {number[][]} matrix */
-  static load(matrix) {
+  /**
+   * @param {number[][]} matrix
+   * @param {(tile: Tile, column: number, row: number) => void} onset
+  */
+  static load(matrix, onset) {
     console.log(matrix[0]?.length, matrix.length);
     const tiles = new TileMap(matrix[0]?.length, matrix.length);
     for(const [ column, row ] of tiles) {
@@ -190,22 +206,30 @@ export default class TileMap {
         Number.parseInt(matrix[row][column] ?? 1)
       );
       tiles.set(column, row, tile);
+      onset?.(tile, column, row);
     }
     // tiles.generateTexture();
     return tiles;
   }
 
 
-  /** @param {string} data */
-  static loadFromText(data) {
+  /**
+   * @param {string} data
+   * @param {(tile: Tile, column: number, row: number) => void} onset
+  */
+  static loadFromText(data, onset) {
     const rows = data.split("\n");
     const matrix = rows.filter(row => row.trim() !== "")
       .map(row => row.trim().split(" "));
-    return TileMap.load(matrix);
+    return TileMap.load(matrix, onset);
   }
 
-  /** @param {string} name */
-  static loadFromImageColors(name, colorsMap = {}) {
+  /**
+   * @param {string} name
+   * @param {{ [color: string]: number }} colorsMap
+   * @param {(tile: Tile, column: number, row: number) => void} onset
+   */
+  static loadFromImageColors(name, colorsMap, onset) {
     const image = raylib.LoadImage("assets/" + name);
     const colors = Canvas.getImageColors(image);
     const matrix = [];
@@ -221,7 +245,7 @@ export default class TileMap {
     // const rows = image.split("\n");
     // const matrix = rows.filter(row => row.trim() !== "")
     //   .map(row => row.trim().split(" "));
-    return this.load(matrix);
+    return this.load(matrix, onset);
   }
 
 };

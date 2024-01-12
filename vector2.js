@@ -7,6 +7,11 @@ export default class Vector2 {
     this.y = y;
   }
 
+  set(x, y) {
+    this.x = x;
+    this.y = y;
+  }
+
   static zero() {
     return new Vector2(0, 0);
   }
@@ -46,15 +51,20 @@ export default class Vector2 {
     return this;
   }
 
-  static scaled(vector, scalar) {
-    return new Vector2(vector.x * scalar, vector.y * scalar);
-  }
-
   limit(max) {
     if (this.magnitude() > max) {
       this.normalize().scale(max);
     }
     return this;
+  }
+
+  *[Symbol.iterator]() {
+    yield this.x;
+    yield this.y;
+  }
+
+  static scaled(vector, scalar) {
+    return new Vector2(vector.x * scalar, vector.y * scalar);
   }
 
   static distance(v1, v2) {

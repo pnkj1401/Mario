@@ -3,6 +3,9 @@ import Game from "./game.js";
 import Canvas from "./canvas.js";
 import TileMap, { Tile } from "./map.js";
 import Player from "./player.js";
+import { PhysicsWorld } from "./physics.js";
+import Matter from "matter-js";
+import { using } from "./util.js";
 
 const screenWidth = 1000;
 const screenHeight = 700;
@@ -25,7 +28,13 @@ export default class MarioGame extends Game {
       backgroundColor: raylib.SKYBLUE
     });
     super(canvas);
-    this.camera.target.y += 100;
+    this.physicsWorld = new PhysicsWorld();
+    Matter.Composite.translate(this.physicsWorld.engine.world, {
+      x: - screenWidth / 2,
+      y: - screenHeight / 2
+    });
+    this.camera.zoom = 1.75;
+    this.camera.target.y += 300;
     Tile.setTextureData({
       0: null,
       1: Canvas.loadTexture("groundstone.png"),
@@ -35,18 +44,28 @@ export default class MarioGame extends Game {
       5: Canvas.loadTexture("pipe.png"),
       6: Canvas.loadTexture("coin.png")
     });
-    this.tileMap = TileMap.loadFromImageColors("mario1.png", colorDataMap);
-    this.player = new Player(this, 100, 100, 50, Canvas.loadTexture("coin.png"));
+    this.tileMap = TileMap.loadFromImageColors("mario1.png", colorDataMap, tile => {
+      using(tile.physicsBody, body => this.physicsWorld.addBody(body));
+    });
+    this.player = new Player(this, 400, 100, Tile.size - 2, Canvas.loadTexture("coin.png"));
     console.log(this.tileMap);
+    this.physicsWorld.addBody(this.player.physicsBody);
+    // this.physicsWorld.addBody(PhysicsWorld.createBody("rectangle", 0, 300, screenWidth, 100, {
+    //   isStatic: true
+    // }));
   }
 
   update(deltaTime) {
+    console.log(deltaTime)
+    this.physicsWorld.update(deltaTime);
     this.player.update(deltaTime);
   }
 
   render() {
+    this.physicsWorld.render();
     this.tileMap.render();
     this.player.render();
+    // raylib.DrawRectangle(0, 300, screenWidth, 100, raylib.GREEN);
   }
 
 };

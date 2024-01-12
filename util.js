@@ -1,6 +1,6 @@
-/** @type {<T>(object: T, scope: (this: T extends {} ? T : never) => void) => void} */
+/** @type {<T>(object: T, scope: (this: T extends {} ? T : never, ref: T extends {} ? T : never) => void) => void} */
 export function using(object, scope) {
   if(object !== null && object instanceof Object) {
-    scope.call(object);
+    scope.call(object, object);
   }
 }

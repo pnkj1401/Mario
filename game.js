@@ -25,16 +25,16 @@ export default class Game {
       // raylib.SetTargetFPS(desiredFPS);
 
       const deltaTime = raylib.GetFrameTime();
-      this.update(deltaTime);
+      this.update(deltaTime * 1000);
 
       raylib.BeginDrawing();
       raylib.ClearBackground(this.canvas.backgroundColor);
 
-      raylib.BeginMode2D(this.camera);
+      // raylib.BeginMode2D(this.camera);
 
       this.render();
 
-      raylib.EndMode2D();
+      // raylib.EndMode2D();
 
       raylib.EndDrawing();
 

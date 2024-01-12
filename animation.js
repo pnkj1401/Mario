@@ -10,7 +10,7 @@ export default class Animation {
   /**
    * @param {S} data
    * @param {keyof S} initialState
-   * @param {Vector2} position
+   * @param {import("matter-js").Vector} position
    * @param {number} width
    * @param {number} height
    * @param {number} speed

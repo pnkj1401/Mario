@@ -1,9 +1,7 @@
-// let playerpath=r.LoadImage("./assets/Mario.png");
-// let Bigwalkpath=r.LoadImage("./assets/Bigwalk.png");
-
 import raylib from "raylib";
+import Matter from "matter-js";
 import Vector2 from "./vector2.js";
-import { PhysicsBody } from "./physics.js";
+import { PhysicsWorld } from "./physics.js";
 import Entity from "./entity.js";
 import { Tile } from "./map.js";
 import Animation, { AnimationState } from "./animation.js";
@@ -18,50 +16,82 @@ export default class Player extends Entity {
     jump: false,
     crouch: false
   };
+  jumpForce = 0.1;
+  movementSpeed = 0.005;
   constructor(game, x, y, size, texture) {
-    super(game, x, y);
-    game.camera.target = this.position;
+    super(game);
+    this.game.camera.target.x = x;
     this.width = size;
     this.height = size;
     this.texture = texture;
-    this.physicsBody = new PhysicsBody(this.position);
-    this.newPosition = Vector2.zero();
-    this.physicsBody.mass = 1;
+    this.physicsBody = PhysicsWorld.createBody("circle", x, y, this.width, {
+      density: 0.001,
+      friction: 0.7,
+      frictionStatic: 0,
+      frictionAir: 0.01,
+      restitution: 0.5
+    });
     this.animation = new Animation({
       idleLeft: new AnimationState(Canvas.loadTexture("idle.png", { flipHorizontal: true }), 1),
       idleRight: new AnimationState(Canvas.loadTexture("idle.png"), 1),
       walkLeft: new AnimationState(Canvas.loadTexture("Mario.png", { flipHorizontal: true }), 3),
-      walkRight: new AnimationState(Canvas.loadTexture("Mario.png"), 3)
-    }, "idleRight", this.position, this.width, this.height, 6);
+      walkRight: new AnimationState(Canvas.loadTexture("Mario.png"), 3),
+      jumpLeft: new AnimationState(Canvas.loadTexture("jump.png", { flipHorizontal: true }), 1),
+      jumpRight: new AnimationState(Canvas.loadTexture("jump.png"), 1),
+    }, "idleRight", this.physicsBody.position, this.width, this.height, 6);
+  }
+
+  get rect() {
+    return {
+      x: this.physicsBody.position.x,
+      y: this.physicsBody.position.y,
+      width: this.physicsBody.bounds.max.x - this.physicsBody.bounds.min.x,
+      height: this.physicsBody.bounds.max.y - this.physicsBody.bounds.min.y
+    };
   }
 
   handleEvents() {
     this.#events.moveLeft = raylib.IsKeyDown(raylib.KEY_A) || raylib.IsKeyDown(raylib.KEY_LEFT);
     this.#events.moveRight = raylib.IsKeyDown(raylib.KEY_D) || raylib.IsKeyDown(raylib.KEY_RIGHT);
-    this.#events.jump = raylib.IsKeyDown(raylib.KEY_SPACE) || raylib.IsKeyDown(raylib.KEY_W) || raylib.IsKeyDown(raylib.KEY_UP);
+    this.#events.jump = raylib.IsKeyReleased(raylib.KEY_SPACE) || raylib.IsKeyReleased(raylib.KEY_W) || raylib.IsKeyReleased(raylib.KEY_UP);
     this.#events.crouch = raylib.IsKeyDown(raylib.KEY_LEFT_CONTROL) || raylib.IsKeyDown(raylib.KEY_S)  || raylib.IsKeyDown(raylib.KEY_DOWN);
     // console.log(this.#events);
   }
 
   update(delta) {
+    this.handleEvents();
+
+    if(this.#events.moveLeft) {
+      // this.physicsBody.torque = -0.1;
+      Matter.Body.applyForce(this.physicsBody, this.physicsBody.position, new Vector2(-this.movementSpeed, 0));
+    }
+    if(this.#events.moveRight) {
+      Matter.Body.applyForce(this.physicsBody, this.physicsBody.position, new Vector2(this.movementSpeed, 0));
+    }
+    if(this.#events.jump) {
+      Matter.Body.applyForce(this.physicsBody, this.physicsBody.position, new Vector2(0, -this.jumpForce));
+    }
+
+    this.game.camera.target.x = this.physicsBody.position.x;
+    this.game.camera.target.y = this.physicsBody.position.y;
+
+    this.animation.update(delta);
+  }
+
+  _update(delta) {
 
     this.handleEvents();
 
     if(this.#events.moveLeft) {
-      this.physicsBody.applyForce(delta, new Vector2(-1500, 0));
+      this.physicsBody.applyForce(delta, new Vector2(-this.movementSpeed, 0));
     }
     if(this.#events.moveRight) {
-      this.physicsBody.applyForce(delta, new Vector2(1500, 0));
+      this.physicsBody.applyForce(delta, new Vector2(this.movementSpeed, 0));
     }
-    if(this.#events.jump) {
-      this.physicsBody.applyForce(delta, new Vector2(0, -1500));
-    }
-    if(this.#events.crouch) {
-      this.physicsBody.applyForce(delta, new Vector2(0, 1500));
-    }
+    this.physicsBody.applyGravity(delta);
 
-    this.newPosition = this.position.copy().add(Vector2.scaled(this.physicsBody.velocity, delta));
-    const tiles = this.game.tileMap.getCollidingTiles(this.newPosition.x, this.newPosition.y, this.width, this.height);
+    let newPosition = this.position.copy().add(Vector2.scaled(this.physicsBody.velocity, delta));
+    let tiles = this.game.tileMap.getCollidingTiles(this.position.x, newPosition.y, this.width, this.height);
 
     using(this.game.tileMap.get(tiles.columnStart, tiles.rowStart), function() {
       this.border.top = raylib.BLACK;
@@ -84,16 +114,30 @@ export default class Player extends Entity {
     });
 
 
+    let topTile = null, bottomTile = null;
     for(let column = tiles.columnStart; column <= tiles.columnEnd; column++) {
-      const groundTile = this.game.tileMap.get(column, tiles.rowEnd);
-      // console.log(this.position, column, tiles.rowEnd, tile?.data ?? null);
-      if(groundTile !== null && groundTile.data > 0) {
-        groundTile.border.top = raylib.WHITE;
-        const intersectingLegth = this.height + this.position.y - groundTile.y;
-        this.physicsBody.velocity.y -= intersectingLegth;
-        break;
+      const currentTopTile = this.game.tileMap.get(column, tiles.rowStart);
+      const currentBottomTile = this.game.tileMap.get(column, tiles.rowEnd);
+      if(currentBottomTile?.data > 0 && bottomTile === null) {
+        bottomTile = currentBottomTile;
+        this.physicsBody.velocity.y = 0;
+        this.position.y = currentBottomTile.physicsBody.position.y - this.height - 0.5;
+      }
+      if(currentTopTile?.data > 0 && topTile === null) {
+        topTile = currentTopTile;
+        this.physicsBody.velocity.y = 1;
+        // this.position.y = currentTopTile.y - this.height - 0.5;
       }
     }
+    if(bottomTile !== null) {
+      if(this.#events.jump) {
+        this.physicsBody.applyImpulse(new Vector2(0, -this.jumpForce));
+      }
+      this.physicsBody.applyFriction(delta, this.physicsBody.frictionFactor);
+    }
+
+    newPosition = this.position.copy().add(Vector2.scaled(this.physicsBody.velocity, delta));
+    tiles = this.game.tileMap.getCollidingTiles(newPosition.x, this.position.y, this.width, this.height);
     let leftTile = null, rightTile = null;
     for(let row = tiles.rowStart; row <= tiles.rowEnd; row++) {
       let tile = this.game.tileMap.get(tiles.columnStart, row);
@@ -109,24 +153,36 @@ export default class Player extends Entity {
     }
 
     if(leftTile) {
-      const intersectingLegth = leftTile.x + Tile.size - this.position.x;
-      this.physicsBody.velocity.x += intersectingLegth;
-      // this.position.x = Math.floor(leftTile.x) + Tile.size;
+      const intersectingLegth = leftTile.physicsBody.position.x + Tile.size - this.position.x;
+      this.physicsBody.velocity.x = 0;
     }
     if(rightTile) {
-      const intersectingLegth = this.width + this.position.x - rightTile.x;
-      this.physicsBody.velocity.x -= intersectingLegth;
-      // this.position.x = Math.floor(rightTile.x) - this.width;
+      const intersectingLegth = this.width + this.position.x - rightTile.physicsBody.position.x;
+      this.physicsBody.velocity.x = 0;
     }
 
+    // console.log(this.physicsBody.velocity.x < 0, this.physicsBody.velocity.x > 0);
+    const jumpOrWalk = bottomTile === null ? "jump" : "walk";
+    if(this.physicsBody.velocity.x < 0) {
+      this.animation.select(jumpOrWalk + "Left");
+    } else if(this.physicsBody.velocity.x > 0) {
+      this.animation.select(jumpOrWalk + "Right");
+    } else if(bottomTile !== null) {
+      this.animation.select(this.animation.currentStateName.includes("Left") ? "idleLeft" : "idleRight");
+    }
+
+    this.oldPosition.set(...this.position);
     this.physicsBody.update(delta);
+
+    this.game.camera.target.x = this.position.x;
+
     this.animation.update(delta);
   }
 
   render() {
-    this.animation.render();
-    raylib.DrawRectangleLines(this.position.x, this.position.y, this.width, this.height, raylib.ColorAlpha(raylib.RED, 0.5));
-    raylib.DrawRectangleLines(this.newPosition.x, this.newPosition.y, this.width, this.height, raylib.ColorAlpha(raylib.BLACK, 0.5));
+    // this.animation.render();
+    raylib.DrawCircleV(this.physicsBody.position, this.width, raylib.RED);
+    raylib.DrawCircleLines(this.physicsBody.position.x, this.physicsBody.position.y, this.width, raylib.RED);
     return;
 
     r.DrawRectangleLines(this.player.x,this.player.y,this.player.width,this.player.height,r.WHITE);
