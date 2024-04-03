@@ -33,7 +33,7 @@ export default class Animation {
   }
 
   update(delta) {
-    this.time += delta * this.speed;
+    this.time += delta / this.speed;
   }
 
   render() {

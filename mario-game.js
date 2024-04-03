@@ -47,8 +47,7 @@ export default class MarioGame extends Game {
     this.tileMap = TileMap.loadFromImageColors("mario1.png", colorDataMap, tile => {
       using(tile.physicsBody, body => this.physicsWorld.addBody(body));
     });
-    this.player = new Player(this, 400, 100, Tile.size - 2, Canvas.loadTexture("coin.png"));
-    console.log(this.tileMap);
+    this.player = new Player(this, 1800, 100, Tile.size - 2, Canvas.loadTexture("coin.png"));
     this.physicsWorld.addBody(this.player.physicsBody);
     // this.physicsWorld.addBody(PhysicsWorld.createBody("rectangle", 0, 300, screenWidth, 100, {
     //   isStatic: true
@@ -56,7 +55,6 @@ export default class MarioGame extends Game {
   }
 
   update(deltaTime) {
-    console.log(deltaTime)
     this.physicsWorld.update(deltaTime);
     this.player.update(deltaTime);
   }

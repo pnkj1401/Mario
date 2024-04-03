@@ -3,7 +3,7 @@ import Matter from "matter-js";
 import Vector2 from "./vector2.js";
 import { PhysicsWorld } from "./physics.js";
 import Entity from "./entity.js";
-import { Tile } from "./map.js";
+import TileMap, { Tile } from "./map.js";
 import Animation, { AnimationState } from "./animation.js";
 import Canvas from "./canvas.js";
 import { using } from "./util.js";
@@ -16,20 +16,23 @@ export default class Player extends Entity {
     jump: false,
     crouch: false
   };
-  jumpForce = 0.1;
-  movementSpeed = 0.005;
+  jumpForce = 6;
+  movementSpeed = 0.15;
+  canjump=false;
+  inair=true;
   constructor(game, x, y, size, texture) {
     super(game);
     this.game.camera.target.x = x;
     this.width = size;
     this.height = size;
     this.texture = texture;
-    this.physicsBody = PhysicsWorld.createBody("circle", x, y, this.width, {
-      density: 0.001,
-      friction: 0.7,
-      frictionStatic: 0,
-      frictionAir: 0.01,
-      restitution: 0.5
+    this.physicsBody = PhysicsWorld.createBody("rectangle", x, y, this.width,this.height, {
+      chamfer:{radius:2},
+      density: 0.1,
+      friction: 0.01,
+      frictionStatic: 0.1,
+      frictionAir: 0.1,
+      restitution: 0,
     });
     this.animation = new Animation({
       idleLeft: new AnimationState(Canvas.loadTexture("idle.png", { flipHorizontal: true }), 1),
@@ -39,6 +42,46 @@ export default class Player extends Entity {
       jumpLeft: new AnimationState(Canvas.loadTexture("jump.png", { flipHorizontal: true }), 1),
       jumpRight: new AnimationState(Canvas.loadTexture("jump.png"), 1),
     }, "idleRight", this.physicsBody.position, this.width, this.height, 6);
+
+    Matter.Events.on(this.game.physicsWorld.engine, 'collisionStart', (event) => {
+
+      event.pairs.forEach((pair) => {
+        const { bodyA, bodyB, slop } = pair;
+        
+        if(pair.collision.normal.y>0){
+          this.canjump=true;
+        }
+
+        const sensorBody = identifySensor(bodyA, bodyB);
+        if(sensorBody){
+          if(sensorBody.collisionFilter.category == 0x0002){
+            console.log("coin", pair.collision.normal);
+            let col = Math.floor(this.physicsBody.position.x/Tile.size);
+            let row = Math.floor(this.physicsBody.position.y/Tile.size);
+            if(pair.collision.normal.x>0){
+              col = Math.floor(col+pair.collision.normal.x)
+            }
+            if(pair.collision.normal.y>0){
+              row = Math.floor(row+pair.collision.normal.y)
+            }
+            let cointile = this.game.tileMap.get(col,row);
+            using(cointile,(cointile)=>{
+              this.game.physicsWorld.removeBody(cointile.physicsBody);
+              cointile.setData(0);
+              // this.game.physicsWorld.addBody(cointile.physicsBody); // cointile.border.top = raylib.YELLOW;
+            })
+          }
+        }
+          
+      });
+      
+    });
+
+    Matter.Events.on(this.game.physicsWorld.engine,'collisionActive',(event)=>{
+      this.inair=false;   
+    })
+
+    
   }
 
   get rect() {
@@ -49,6 +92,7 @@ export default class Player extends Entity {
       height: this.physicsBody.bounds.max.y - this.physicsBody.bounds.min.y
     };
   }
+  
 
   handleEvents() {
     this.#events.moveLeft = raylib.IsKeyDown(raylib.KEY_A) || raylib.IsKeyDown(raylib.KEY_LEFT);
@@ -60,22 +104,32 @@ export default class Player extends Entity {
 
   update(delta) {
     this.handleEvents();
-
     if(this.#events.moveLeft) {
-      // this.physicsBody.torque = -0.1;
-      Matter.Body.applyForce(this.physicsBody, this.physicsBody.position, new Vector2(-this.movementSpeed, 0));
+      Matter.Body.applyForce(this.physicsBody, new Vector2(this.physicsBody.position.x, this.physicsBody.position.y), new Vector2(-this.movementSpeed, 0));
+      this.animation.select("walkLeft");
     }
     if(this.#events.moveRight) {
-      Matter.Body.applyForce(this.physicsBody, this.physicsBody.position, new Vector2(this.movementSpeed, 0));
+      Matter.Body.applyForce(this.physicsBody, new Vector2(this.physicsBody.position.x, this.physicsBody.position.y), new Vector2(this.movementSpeed, 0));
+      this.animation.select("walkRight");
     }
-    if(this.#events.jump) {
+    if(this.#events.jump && this.canjump) {
       Matter.Body.applyForce(this.physicsBody, this.physicsBody.position, new Vector2(0, -this.jumpForce));
+      this.canjump=false;
+      this.inair=true;
+    }
+    Matter.Body.setAngularSpeed(this.physicsBody, 0)
+ 
+    if(Math.floor(this.physicsBody.speed)==0){
+      this.animation.select(this.animation.currentStateName.includes("Right") ? "idleRight" : "idleLeft");
+    }
+    if(this.inair){
+      this.animation.select(Math.floor(this.physicsBody.velocity.x)<0?"jumpLeft":"jumpRight");
     }
 
-    this.game.camera.target.x = this.physicsBody.position.x;
-    this.game.camera.target.y = this.physicsBody.position.y;
+    this.game.camera.target.x = this.physicsBody.position.x ;
+    this.game.camera.target.y = this.physicsBody.position.y ;
 
-    this.animation.update(delta);
+    this.animation.update(delta/20);
   }
 
   _update(delta) {
@@ -180,9 +234,10 @@ export default class Player extends Entity {
   }
 
   render() {
-    // this.animation.render();
-    raylib.DrawCircleV(this.physicsBody.position, this.width, raylib.RED);
-    raylib.DrawCircleLines(this.physicsBody.position.x, this.physicsBody.position.y, this.width, raylib.RED);
+    this.animation.render();
+    // raylib.DrawRectanglePro(this.rect, Vector2.scaled({ x: this.rect.width, y: this.rect.height }, 0.5), this.physicsBody.angle, raylib.RED);
+    // raylib.DrawRectangle(this.physicsBody.position.x-this.rect.width/2, this.physicsBody.position.y-this.rect.height/2, this.width,this.height, raylib.RED);
+
     return;
 
     r.DrawRectangleLines(this.player.x,this.player.y,this.player.width,this.player.height,r.WHITE);
@@ -269,3 +324,13 @@ export default class Player extends Entity {
   }
 
 };
+
+function identifySensor(bodyA, bodyB){
+  if (bodyA.isSensor) {
+    return bodyA;
+  }
+  if (bodyB.isSensor) {
+    return bodyB;
+  }
+  return null;
+}

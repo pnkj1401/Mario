@@ -13,7 +13,7 @@ export default class Game {
     this.camera.target = raylib.Vector2Zero();
     this.camera.offset = this.canvas.center;
     this.camera.rotation = 0;
-    this.camera.zoom = 1;
+    this.camera.zoom = 3;
 
   }
 
@@ -30,11 +30,11 @@ export default class Game {
       raylib.BeginDrawing();
       raylib.ClearBackground(this.canvas.backgroundColor);
 
-      // raylib.BeginMode2D(this.camera);
+      raylib.BeginMode2D(this.camera);
 
       this.render();
 
-      // raylib.EndMode2D();
+      raylib.EndMode2D();
 
       raylib.EndDrawing();
 

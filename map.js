@@ -9,7 +9,7 @@ export class Tile {
 
   static #size = 32;
   static #textureData = {};
-
+  #position;
   /** @type {raylib.Texture} */
   #texture = null;
 
@@ -19,7 +19,7 @@ export class Tile {
    * @param {T} data
   */
   constructor(x, y, data) {
-    this.data = data;
+    this.#position={x,y};
     this.border = {
       /** @type {raylib.Color | null} */
       left: null,
@@ -30,10 +30,46 @@ export class Tile {
       /** @type {raylib.Color | null} */
       top: null
     };
-    this.physicsBody = data !== 0 ? PhysicsWorld.createBody("rectangle", x, y, Tile.#size, Tile.#size, {
-      isStatic: true,
-      restitution: 0
-    }) : null;
+    this.setData(data);
+  }
+  /** @param {T} data */
+  setData(data) {
+    this.data = data;
+
+    switch(data){
+      case 0:
+        this.physicsBody = null;
+      break;
+      case 6: {
+        this.physicsBody = PhysicsWorld.createBody("rectangle", this.#position.x, this.#position.y, Tile.#size, Tile.#size, {
+          isStatic: true,
+          restitution: 0,
+          friction:1,
+          isSensor:true,
+          collisionFilter:{
+              category: 0x0002,
+              mask:0x0001
+          }
+        })
+        
+       }
+      break;
+      default:
+        {
+        this.physicsBody = PhysicsWorld.createBody("rectangle", this.#position.x, this.#position.y, Tile.#size, Tile.#size, {
+          isStatic: true,
+          restitution: 0,
+          friction:1,
+        })
+      }
+    }
+
+    // this.physicsBody = data !== 0 ? 
+    // PhysicsWorld.createBody("rectangle", x, y, Tile.#size, Tile.#size, {
+    //   isStatic: true,
+    //   restitution: 0,
+    //   friction:1,
+    // }) : null;
     this.#texture = Tile.#textureData[data] ?? null;
   }
 
@@ -56,6 +92,7 @@ export class Tile {
     using(this.physicsBody, function() {
       raylib.DrawRectangleLines(this.position.x, this.position.y, this.bounds.max.x - this.bounds.min.x, this.bounds.max.y - this.bounds.min.y, raylib.RED);
     });
+    if(this.physicsBody == null) return;
     const borderWidth = 4;
     if(this.border.left) {
       raylib.DrawRectangleLinesEx({
@@ -138,13 +175,14 @@ export default class TileMap {
 
   /** @param {Vector2} position */
   getByPosition(position) {
-    const flooredVector = position.floored();
-    return this.#grid[flooredVector.x]?.[flooredVector.y] ?? null;
+    return this.#grid[ Math.floor(position.x/Tile.size)]?.[ Math.floor(position.y/Tile.size)] ?? null;
   }
 
   set(column, row, tile) {
     this.#grid[column][row] = tile;
   }
+
+
 
   render() {
     for(const array of this.#grid) {

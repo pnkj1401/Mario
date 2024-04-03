@@ -8,6 +8,7 @@ export class PhysicsWorld {
 
   constructor() {
     this.engine = Matter.Engine.create();
+    this.engine.gravity.y = 2;
     // Matter.Render.create({engine: this.engine});
   }
 
@@ -20,12 +21,17 @@ export class PhysicsWorld {
   add(...bodies) {
     Matter.World.add(this.engine.world, bodies);
   }
-
+   
+  /** @param {Matter.Body} body */
+  removeBody(body) {
+    Matter.World.remove(this.engine.world, body);
+  }
   update(delta) {
     Matter.Engine.update(this.engine, delta);
   }
 
   render() {
+    return;
     const bodies = Matter.Composite.allBodies(this.engine.world);
     for(const body of bodies) {
       if(body.render.visible) {
