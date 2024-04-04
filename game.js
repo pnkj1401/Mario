@@ -35,7 +35,7 @@ export default class Game {
       this.render();
 
       raylib.EndMode2D();
-
+      raylib.DrawFPS(16, 16);
       raylib.EndDrawing();
 
     }

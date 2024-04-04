@@ -3,6 +3,7 @@ import Canvas from "./canvas.js";
 import Vector2 from "./vector2.js";
 import { PhysicsWorld } from "./physics.js";
 import { using } from "./util.js";
+import { Category } from "./mario-game.js";
 
 /** @template {number} T */
 export class Tile {
@@ -19,7 +20,7 @@ export class Tile {
    * @param {T} data
   */
   constructor(x, y, data) {
-    this.#position={x,y};
+    this.#position = { x, y };
     this.border = {
       /** @type {raylib.Color | null} */
       left: null,
@@ -32,6 +33,11 @@ export class Tile {
     };
     this.setData(data);
   }
+
+  get position() {
+    return this.#position;
+  }
+
   /** @param {T} data */
   setData(data) {
     this.data = data;
@@ -46,9 +52,9 @@ export class Tile {
           restitution: 0,
           friction:1,
           isSensor:true,
-          collisionFilter:{
-              category: 0x0002,
-              mask:0x0001
+          collisionFilter: {
+            category: Category.COIN,
+            mask: Category.PLAYER
           }
         })
         
@@ -60,6 +66,10 @@ export class Tile {
           isStatic: true,
           restitution: 0,
           friction:1,
+          collisionFilter: {
+            category: Category.GROUND,
+            mask: Category.PLAYER | Category.MUSHROOM
+          }
         })
       }
     }
@@ -175,7 +185,15 @@ export default class TileMap {
 
   /** @param {Vector2} position */
   getByPosition(position) {
-    return this.#grid[ Math.floor(position.x/Tile.size)]?.[ Math.floor(position.y/Tile.size)] ?? null;
+    return this.#grid[ Math.floor(position.x / Tile.size) ]?.[ Math.floor(position.y / Tile.size) ] ?? null;
+  }
+
+  /**
+   * @param {Tile<any>} tile
+   * @param {{ x?: number; y?: number }} position
+   */
+  getRelative(tile, position) {
+    return this.#grid[ Math.floor(tile.position.x / Tile.size) + (position.x ?? 0) ]?.[ Math.floor(tile.position.y / Tile.size) + (position.y ?? 0) ] ?? null;
   }
 
   set(column, row, tile) {

@@ -7,7 +7,7 @@ import TileMap, { Tile } from "./map.js";
 import Animation, { AnimationState } from "./animation.js";
 import Canvas from "./canvas.js";
 import { using } from "./util.js";
-
+import MarioGame, { Category, PhysicsEntity } from "./mario-game.js";
 
 export default class Player extends Entity {
   #events = {
@@ -20,19 +20,22 @@ export default class Player extends Entity {
   movementSpeed = 0.15;
   canjump=false;
   inair=true;
-  constructor(game, x, y, size, texture) {
+  constructor(game, x, y, size) {
     super(game);
     this.game.camera.target.x = x;
     this.width = size;
     this.height = size;
-    this.texture = texture;
-    this.physicsBody = PhysicsWorld.createBody("rectangle", x, y, this.width,this.height, {
+    this.physicsBody = PhysicsWorld.createBody("rectangle", x, y, this.width, this.height, {
       chamfer:{radius:2},
       density: 0.1,
       friction: 0.01,
       frictionStatic: 0.1,
       frictionAir: 0.1,
       restitution: 0,
+      collisionFilter: {
+        category: Category.PLAYER,
+        mask: Category.GROUND | Category.COIN | Category.MUSHROOM
+      }
     });
     this.animation = new Animation({
       idleLeft: new AnimationState(Canvas.loadTexture("idle.png", { flipHorizontal: true }), 1),
@@ -47,25 +50,52 @@ export default class Player extends Entity {
 
       event.pairs.forEach((pair) => {
         const { bodyA, bodyB, slop } = pair;
-        
-        if(pair.collision.normal.y>0){
+        if(Math.floor(pair.collision.normal.y) > 0){
           this.canjump=true;
+        }
+        if(Math.ceil(pair.collision.normal.y) < 0) {
+          using(this.game.tileMap.getByPosition(bodyB.position), tile => {
+            if(tile.data !== 4) {
+              return;
+            }
+            const body = PhysicsWorld.createBody(
+              "circle",
+              tile.physicsBody.position.x,
+              tile.physicsBody.position.y - Tile.size,
+              Tile.size / 2,
+              {
+                density: 4,
+                friction: 0.01,
+                frictionStatic: 0.01,
+                frictionAir: 0.01,
+                restitution: 0,
+                collisionFilter: {
+                  category: Category.MUSHROOM,
+                  mask: Category.GROUND | Category.PLAYER
+                }
+              }
+            );
+            const entity = new PhysicsEntity(
+              this.game,
+              Canvas.loadTexture("idle.png"),
+              body,
+              { width: Tile.size, height: Tile.size }
+            );
+            this.game.addEntity(entity);
+            tile.setData(3);
+          });
         }
 
         const sensorBody = identifySensor(bodyA, bodyB);
         if(sensorBody){
-          if(sensorBody.collisionFilter.category == 0x0002){
-            console.log("coin", pair.collision.normal);
-            let col = Math.floor(this.physicsBody.position.x/Tile.size);
-            let row = Math.floor(this.physicsBody.position.y/Tile.size);
-            if(pair.collision.normal.x>0){
-              col = Math.floor(col+pair.collision.normal.x)
-            }
-            if(pair.collision.normal.y>0){
-              row = Math.floor(row+pair.collision.normal.y)
-            }
+          if(sensorBody.collisionFilter.category == Category.COIN) {
+            let col = Math.floor(sensorBody.position.x/Tile.size);
+            let row = Math.floor(sensorBody.position.y/Tile.size);
             let cointile = this.game.tileMap.get(col,row);
             using(cointile,(cointile)=>{
+              if(cointile.physicsBody === null) {
+                return;
+              }
               this.game.physicsWorld.removeBody(cointile.physicsBody);
               cointile.setData(0);
               // this.game.physicsWorld.addBody(cointile.physicsBody); // cointile.border.top = raylib.YELLOW;
@@ -84,10 +114,43 @@ export default class Player extends Entity {
     
   }
 
+  createBigBody() {
+    this.width = Tile.size * 1.4 - 2;
+    this.height = Tile.size * 1.6 - 4;
+    const body = PhysicsWorld.createBody("rectangle", this.physicsBody.position.x, this.physicsBody.position.y, this.width, this.height, {
+      density: 0.1 / 2.5,
+      friction: 0.01,
+      frictionStatic: 0.1,
+      frictionAir: 0.1,
+      restitution: 0,
+      collisionFilter: {
+        category: Category.PLAYER,
+        mask: Category.GROUND | Category.COIN | Category.MUSHROOM
+      }
+    });
+    this.physicsBody = body;
+    this.game.physicsWorld.removeBody(this.physicsBody);
+    this.game.physicsWorld.addBody(body);
+    this.animation.position = body.position;
+    this.animation.offsetX = 0;
+    this.animation.offsetY = -Tile.size / 3.2;
+    this.animation.width = this.width;
+    this.animation.height = this.height;
+    this.animation.setData({
+      idleLeft: new AnimationState(Canvas.loadTexture("Bigidle.png", { flipHorizontal: true }), 1),
+      idleRight: new AnimationState(Canvas.loadTexture("Bigidle.png"), 1),
+      walkLeft: new AnimationState(Canvas.loadTexture("Bigwalk.png", { flipHorizontal: true }), 3),
+      walkRight: new AnimationState(Canvas.loadTexture("Bigwalk.png"), 3),
+      jumpLeft: new AnimationState(Canvas.loadTexture("jump.png", { flipHorizontal: true }), 1),
+      jumpRight: new AnimationState(Canvas.loadTexture("jump.png"), 1),
+    });
+
+  }
+
   get rect() {
     return {
-      x: this.physicsBody.position.x,
-      y: this.physicsBody.position.y,
+      x: this.physicsBody.position.x + Tile.size / 2,
+      y: this.physicsBody.position.y + Tile.size / 2,
       width: this.physicsBody.bounds.max.x - this.physicsBody.bounds.min.x,
       height: this.physicsBody.bounds.max.y - this.physicsBody.bounds.min.y
     };
@@ -97,7 +160,7 @@ export default class Player extends Entity {
   handleEvents() {
     this.#events.moveLeft = raylib.IsKeyDown(raylib.KEY_A) || raylib.IsKeyDown(raylib.KEY_LEFT);
     this.#events.moveRight = raylib.IsKeyDown(raylib.KEY_D) || raylib.IsKeyDown(raylib.KEY_RIGHT);
-    this.#events.jump = raylib.IsKeyReleased(raylib.KEY_SPACE) || raylib.IsKeyReleased(raylib.KEY_W) || raylib.IsKeyReleased(raylib.KEY_UP);
+    this.#events.jump = raylib.IsKeyPressed(raylib.KEY_SPACE) || raylib.IsKeyPressed(raylib.KEY_W) || raylib.IsKeyReleased(raylib.KEY_UP);
     this.#events.crouch = raylib.IsKeyDown(raylib.KEY_LEFT_CONTROL) || raylib.IsKeyDown(raylib.KEY_S)  || raylib.IsKeyDown(raylib.KEY_DOWN);
     // console.log(this.#events);
   }
@@ -234,8 +297,8 @@ export default class Player extends Entity {
   }
 
   render() {
-    this.animation.render();
     // raylib.DrawRectanglePro(this.rect, Vector2.scaled({ x: this.rect.width, y: this.rect.height }, 0.5), this.physicsBody.angle, raylib.RED);
+    this.animation.render();
     // raylib.DrawRectangle(this.physicsBody.position.x-this.rect.width/2, this.physicsBody.position.y-this.rect.height/2, this.width,this.height, raylib.RED);
 
     return;

@@ -1,11 +1,14 @@
 import raylib from "raylib";
 import Vector2 from "./vector2.js";
+import { Tile } from "./map.js";
 
 /** @template {{ [state: string]: AnimationState }} S */
 export default class Animation {
 
   counter = 0;
   time = 0;
+  offsetX = 0;
+  offsetY = 0;
 
   /**
    * @param {S} data
@@ -22,6 +25,10 @@ export default class Animation {
     this.width = width;
     this.height = height;
     this.speed = speed ?? 6;
+  }
+
+  setData(data) {
+    this.data = data;
   }
 
   /** @param {keyof S} name */
@@ -54,8 +61,8 @@ export default class Animation {
     };
 
     const destination = {
-      x: this.position.x,
-      y: this.position.y,
+      x: this.position.x + this.offsetX,
+      y: this.position.y + this.offsetY,
       width: this.width,
       height: this.height
     };
